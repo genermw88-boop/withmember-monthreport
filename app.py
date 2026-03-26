@@ -1,27 +1,63 @@
 import streamlit as st
+import requests
+import re
 import random
 from datetime import datetime
 
 # -----------------------------------------------------------------
-# 1. 다이내믹 텍스트 생성 함수 (키워드별 개별 평가용)
+# 1. 네이버 API 순위 자동 추출 로직 (매칭률 극대화)
+# -----------------------------------------------------------------
+def clean_html(raw_html):
+    cleanr = re.compile('<.*?>')
+    return re.sub(cleanr, '', raw_html).replace('&amp;', '&')
+
+def get_auto_rank(keyword, store_name, client_id, client_secret):
+    headers = {"X-Naver-Client-Id": client_id, "X-Naver-Client-Secret": client_secret}
+    # 한 번에 최대치인 100개까지 검색하여 순위를 찾습니다.
+    url = f"https://openapi.naver.com/v1/search/local.json?query={keyword}&display=100"
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            items = res.json().get('items', [])
+            
+            # 띄어쓰기, 대소문자 모두 무시하고 최대한 유연하게 매칭합니다.
+            target_name = store_name.replace(" ", "").lower()
+            
+            for index, item in enumerate(items):
+                title = clean_html(item.get('title', '')).replace(" ", "").lower()
+                # API 결과 제목에 매장명이 포함되어 있으면 순위 반환
+                if target_name in title:
+                    return index + 1
+    except Exception:
+        pass
+    
+    return 0 # 100위 안에 없거나 에러 시 0 반환
+
+# -----------------------------------------------------------------
+# 2. 다이내믹 텍스트 생성 (자동 추출된 순위 기반)
 # -----------------------------------------------------------------
 def get_keyword_evaluation(keyword, rank):
-    if rank <= 5:
+    if rank == 0:
+        return f"현재 '{keyword}' 키워드에 대한 맞춤형 순위 최적화(SEO) 기초 작업을 진행 중입니다. 네이버 알고리즘이 매장의 데이터를 수집하고 평가하는 단계이며, 조만간 검색 결과에 안정적으로 안착할 수 있도록 다방면의 유효 트래픽을 유도하고 있습니다."
+    elif rank <= 5:
         texts = [
             f"'{keyword}' 검색 시 **최상위권({rank}위)** 노출을 확고히 점유하고 있습니다. 이 '골든 존'은 잠재 고객의 유입이 가장 집중되는 곳으로, 막대한 트래픽이 실질적인 예약과 방문으로 직결되는 완벽한 매출 견인차 역할을 하고 있습니다.",
             f"현재 '{keyword}' 검색 결과에서 **{rank}위**에 랭크되어 압도적인 브랜드 인지도를 확보했습니다. 광고비 지출 없이도 자연 검색을 통해 매일 엄청난 수의 지역 타겟 고객들에게 1순위 선택지로 노출 중입니다."
         ]
+        return random.choice(texts)
     elif rank <= 15:
         texts = [
             f"'{keyword}' 키워드 검색 시 **상위권({rank}위)**에 안정적으로 노출되고 있습니다. 치열한 지역 상권 경쟁 속에서도 훌륭한 방어율을 보이며, 최상위권 진입을 위한 탄탄한 유효 트래픽을 모으고 있습니다.",
             f"현재 '{keyword}'에서 **{rank}위** 노출을 유지 중입니다. 지속적인 트래픽 관리와 체류 시간 최적화 작업이 알고리즘에 긍정적으로 작용하여, 매장을 찾는 고객들에게 높은 신뢰감을 주는 위치를 선점했습니다."
         ]
+        return random.choice(texts)
     else:
         texts = [
             f"'{keyword}' 키워드에서 **{rank}위**를 기록하며 의미 있는 순위 상승 궤도에 안착했습니다. 네이버 알고리즘에 맞춘 꾸준한 트래픽 파이프라인 구축이 성과를 내기 시작했으며, 지속적인 관리로 상위권 노출을 이끌어내겠습니다.",
             f"현재 최적화 작업을 통해 '{keyword}' 순위가 **{rank}위**로 가시권에 진입했습니다. 블로그와 SNS 바이럴 시너지를 더욱 집중시켜 네이버 플레이스 지수를 다음 단계로 끌어올리겠습니다."
         ]
-    return random.choice(texts)
+        return random.choice(texts)
 
 def get_dynamic_evaluations():
     evals = {}
@@ -42,36 +78,37 @@ def get_dynamic_evaluations():
         "인스타그램을 통한 시각적 바이럴이 성공적으로 확산되었습니다. 이는 매장을 '반드시 가봐야 할 핫플레이스'로 포지셔닝하며, 직접 검색을 유발해 네이버 순위 상승에도 결정적인 가점을 주고 있습니다."
     ]
     evals['insta'] = random.choice(insta_texts)
-    
     return evals
 
 # -----------------------------------------------------------------
-# 2. 메인 UI 및 입력 폼
+# 3. 메인 UI 및 입력 폼
 # -----------------------------------------------------------------
 st.set_page_config(page_title="WithMember 리포트 자동화", page_icon="📈", layout="wide")
 
 st.title("📈 WithMember 프리미엄 마케팅 홍보 효과 보고서")
-st.markdown("정확한 성과 데이터를 기반으로 클라이언트의 신뢰를 높이는 평가 보고서를 생성합니다.")
+st.markdown("API 자동 분석을 통해 순위를 찾아내고, 전문적인 마케팅 평가 보고서를 1초 만에 완성합니다.")
+
+try:
+    naver_client_id = st.secrets["NAVER_CLIENT_ID"]
+    naver_client_secret = st.secrets["NAVER_CLIENT_SECRET"]
+except KeyError:
+    st.error("⚠️ Streamlit Secrets에 네이버 API 키가 없습니다. 세팅을 확인해 주세요.")
+    st.stop()
 
 with st.form("report_form"):
-    st.subheader("📌 1. 타겟 매장 및 핵심 홍보 키워드 (최대 5개)")
-    store_name = st.text_input("매장명 (정확히 입력)", placeholder="예: 동경생고기")
+    st.subheader("📌 1. 타겟 매장 및 자동 분석할 홍보 키워드 (최대 5개)")
+    store_name = st.text_input("매장명 (순위 검색용, 정확히 입력)", placeholder="예: 동경생고기")
     
-    st.caption("이번 달 집중 관리한 키워드와 현재 플레이스 순위를 입력해 주세요. (입력한 곳까지만 출력됩니다)")
+    st.caption("홍보 키워드만 입력하세요. **순위는 AI(API)가 자동으로 찾아옵니다.**")
     
     keywords = []
-    ranks = []
-    
-    # 5개의 키워드와 순위를 2개의 열로 나란히 입력받음
+    # 5개의 키워드 입력칸 배치
+    kw_cols = st.columns(5)
     for i in range(5):
-        col_k, col_r = st.columns([3, 1])
-        with col_k:
-            k = st.text_input(f"홍보 키워드 {i+1}", key=f"kw_{i}")
-        with col_r:
-            r = st.number_input(f"순위", min_value=1, value=1, key=f"rank_{i}")
-        if k.strip():
-            keywords.append(k)
-            ranks.append(r)
+        with kw_cols[i]:
+            k = st.text_input(f"키워드 {i+1}", key=f"kw_{i}")
+            if k.strip():
+                keywords.append(k.strip())
 
     st.divider()
 
@@ -86,40 +123,49 @@ with st.form("report_form"):
     st.divider()
 
     st.subheader("💬 3. 고객 관리 및 바이럴 홍보 지표")
-    col3, col4 = st.columns(2)
-    with col3:
+    col1, col2 = st.columns(2)
+    with col1:
         place_replies = st.number_input("네이버 방문자 리뷰 사장님 답글 수", min_value=0, value=45)
         kakao_google_reviews = st.number_input("카카오맵/구글 신규 리뷰 확보 수", min_value=0, value=5)
-    with col4:
+    with col2:
         insta_views = st.number_input("인스타 홍보 영상 총 조회수", min_value=0, value=15000)
 
-    submit_button = st.form_submit_button("마케팅 홍보 효과 평가 생성")
+    submit_button = st.form_submit_button("API 순위 자동 분석 및 보고서 추출")
 
 # -----------------------------------------------------------------
-# 3. 데이터 분석 및 결과 출력
+# 4. 데이터 분석 및 결과 출력
 # -----------------------------------------------------------------
 if submit_button:
     if not store_name or not keywords:
         st.warning("매장명과 최소 1개 이상의 홍보 키워드를 입력해 주세요.")
     else:
-        with st.spinner('다이내믹 분석 멘트를 적용하여 보고서를 작성 중입니다...'):
+        with st.spinner('API가 네이버를 검색하여 자동으로 순위를 분석 중입니다...'):
+            
+            # 입력된 키워드들에 대해 자동으로 순위를 추출합니다.
+            analyzed_ranks = []
+            for kw in keywords:
+                rank = get_auto_rank(kw, store_name, naver_client_id, naver_client_secret)
+                analyzed_ranks.append(rank)
             
             eval_texts = get_dynamic_evaluations()
             current_month = datetime.now().month
 
-            st.success("✅ 에러 없이 깔끔한 맞춤형 평가 보고서가 생성되었습니다!")
+            st.success("✅ AI 순위 자동 분석 및 평가 보고서 생성이 완료되었습니다!")
             
             st.markdown("---")
             st.markdown(f"## [WithMember] {current_month}월 종합 마케팅 홍보 효과 보고서")
             st.markdown(f"**수신:** {store_name} 대표님")
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # 1. 키워드별 순위 평가 (입력한 키워드 개수만큼 반복해서 출력)
+            # 1. 키워드별 순위 평가 (API 자동 분석 결과)
             st.markdown(f"### 🥇 1. 핵심 타겟 키워드 검색 노출 및 유입 효과")
             for i in range(len(keywords)):
-                st.markdown(f"> **[{keywords[i]}]**")
-                st.markdown(f"- **홍보 효과 평가:** {get_keyword_evaluation(keywords[i], ranks[i])}")
-                st.markdown("") # 줄바꿈
+                rank_num = analyzed_ranks[i]
+                rank_display = f"{rank_num}위" if rank_num > 0 else "현재 100위 밖 (최적화 진행 중)"
+                
+                st.markdown(f"> **[{keywords[i]}]** - 현재 순위: **{rank_display}**")
+                st.markdown(f"- **홍보 효과 평가:** {get_keyword_evaluation(keywords[i], rank_num)}")
+                st.markdown("") 
             
             # 2. 블로그 리뷰 평가
             st.markdown(f"### 📝 2. 우수 블로그 리뷰(리뷰노트) 배포 및 설득 효과")
