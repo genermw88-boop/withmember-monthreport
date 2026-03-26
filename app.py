@@ -18,7 +18,7 @@ def get_real_blog_reviews(keyword, client_id, client_secret):
             result = response.json()
             return result.get('total', 0)
         else:
-            st.warning(f"블로그 API 호출 실패 (상태 코드: {response.status_code}) - API 키를 다시 확인해 주세요.")
+            st.warning(f"블로그 API 호출 실패 (상태 코드: {response.status_code}) - 네이버 개발자 센터에서 '검색' API가 추가되었는지 확인해 주세요.")
             return 0
     except Exception as e:
         st.error(f"블로그 API 에러 발생: {e}")
@@ -37,16 +37,16 @@ try:
     naver_client_id = st.secrets["NAVER_CLIENT_ID"]
     naver_client_secret = st.secrets["NAVER_CLIENT_SECRET"]
 except KeyError:
-    st.error("⚠️ Streamlit Secrets에 네이버 API 키가 설정되지 않았습니다.")
+    st.error("⚠️ Streamlit 사이트 우측 상단 점 3개(⋮) -> Settings -> Secrets 탭에 네이버 API 키를 먼저 입력해 주세요.")
     st.stop()
 
 with st.form("report_form"):
     st.subheader("📌 매장 및 타겟 정보")
     col1, col2 = st.columns(2)
     with col1:
-        store_name = st.text_input("매장명", placeholder="예: 맛집상회 강남점")
+        store_name = st.text_input("매장명", placeholder="예: 동경생고기")
     with col2:
-        blog_keyword = st.text_input("블로그 API 검색 키워드", placeholder="예: 맛집상회 강남점 리뷰노트")
+        blog_keyword = st.text_input("블로그 API 검색 키워드", placeholder="예: 대구 달서구 맛집 동경생고기")
 
     st.divider()
 
@@ -69,7 +69,7 @@ with st.form("report_form"):
 if submit_button:
     with st.spinner('데이터를 분석하고 리포트를 작성 중입니다...'):
         
-        # 블로그 API 추출
+        # 블로그 API 추출 실행
         real_blog_count = get_real_blog_reviews(blog_keyword, naver_client_id, naver_client_secret)
         
         # 소통율 계산
@@ -92,7 +92,7 @@ if submit_button:
         st.markdown(f"> **이번 달 신규 방문자 리뷰 {place_total_reviews}건 중, 사장님 답글 {place_replies}건 완료 (소통율 {reply_rate}%)**")
         st.markdown("- **로직 분석:** 네이버 알고리즘은 활발한 소통이 일어나는 매장에 플레이스 지수(Place Index) 가점을 부여합니다. 꾸준한 답글 관리는 검색 순위 최적화(SEO)의 핵심 기반입니다.")
         
-        st.markdown("### 📝 2. 블로그 리뷰노트 누적 및 노출")
+        st.markdown("### 📝 2. 블로그 리뷰노트 누적 및 노출 현황")
         st.markdown(f"> **'{blog_keyword}' 관련 고품질 블로그 리뷰 총 {real_blog_count:,}건 누적 발행**")
         st.markdown("- **로직 분석:** C-Rank 기반의 양질의 포스팅이 누적되며 스마트블록 점유율을 높이고 있습니다. 이는 플레이스로 넘어오는 징검다리 트래픽 역할을 톡톡히 하고 있습니다.")
         
